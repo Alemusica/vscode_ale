@@ -5,7 +5,7 @@
 
 import * as vscode from 'vscode';
 
-export function activate(context: vscode.ExtensionContext): void {
+export function activate(_context: vscode.ExtensionContext): void {
 	console.log('[phonon-module-ristorazione] activated');
 	// Data providers will be registered here via phonon.* API in future phases
 }

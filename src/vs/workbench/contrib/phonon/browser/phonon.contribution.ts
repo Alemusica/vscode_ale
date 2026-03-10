@@ -30,6 +30,7 @@ import { ILanguageModelsService } from '../../chat/common/languageModels.js';
 import { ChatViewContainerId, IChatWidgetService } from '../../chat/browser/chat.js';
 import { sessionOpenerRegistry } from '../../chat/browser/agentSessions/agentSessionsOpener.js';
 import { ACTIVE_GROUP, IEditorService } from '../../../services/editor/common/editorService.js';
+import { IEditorGroupsService } from '../../../services/editor/common/editorGroupsService.js';
 import { IEditorResolverService, RegisteredEditorPriority } from '../../../services/editor/common/editorResolverService.js';
 import { ISpeechService } from '../../speech/common/speechService.js';
 import { IWorkbenchLayoutService, Parts } from '../../../services/layout/browser/layoutService.js';
@@ -386,6 +387,43 @@ class PhononContribution extends Disposable implements IWorkbenchContribution {
 }
 
 registerWorkbenchContribution2(PhononContribution.ID, PhononContribution, WorkbenchPhase.BlockRestore);
+
+// --- Startup: open Phonon chat editor when no editors are open ---
+
+class PhononStartupEditorContribution extends Disposable implements IWorkbenchContribution {
+
+	static readonly ID = 'workbench.contrib.phononStartupEditor';
+
+	constructor(
+		@IEditorGroupsService private readonly editorGroupsService: IEditorGroupsService,
+		@IInstantiationService private readonly instantiationService: IInstantiationService,
+		@ILogService private readonly logService: ILogService,
+	) {
+		super();
+		this._openOnStartup();
+	}
+
+	private async _openOnStartup(): Promise<void> {
+		await this.editorGroupsService.whenReady;
+
+		try {
+			// Open a chat editor with prompt bar as the default startup view
+			const widgetService = this.instantiationService.invokeFunction(
+				accessor => accessor.get(IChatWidgetService)
+			);
+			const { ChatEditorInput } = await import('../../chat/browser/widgetHosts/editor/chatEditorInput.js');
+			await widgetService.openSession(
+				ChatEditorInput.getNewEditorUri(),
+				ACTIVE_GROUP,
+				{ pinned: true }
+			);
+		} catch (err) {
+			this.logService.warn('[Phonon] Failed to open startup chat editor', err);
+		}
+	}
+}
+
+registerWorkbenchContribution2(PhononStartupEditorContribution.ID, PhononStartupEditorContribution, WorkbenchPhase.AfterRestored);
 
 // --- PhononEditor pane registration ---
 

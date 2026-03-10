@@ -694,7 +694,12 @@ class ExtensionsScanner extends Disposable {
 		const id = getGalleryExtensionId(manifest.publisher, manifest.name);
 		const identifier = metadata?.id ? { id, uuid: metadata.id } : { id };
 		const type = metadata?.isSystem ? ExtensionType.System : input.type;
-		const isBuiltin = type === ExtensionType.System || !!metadata?.isBuiltin;
+		// Phonon modules ship in the system extensions folder but must appear in the
+		// "Installed" view so the user can see (and manage) them. When the manifest
+		// declares `"phonon": true`, we force isBuiltin to false.
+		const isBuiltin = manifest.phonon === true
+			? false
+			: type === ExtensionType.System || !!metadata?.isBuiltin;
 		try {
 			manifest = await this.translateManifest(input.location, manifest, ExtensionScannerInput.createNlsConfiguration(input));
 		} catch (error) {

@@ -324,6 +324,7 @@ export interface IRelaxedExtensionManifest {
 	api?: string;
 	scripts?: { [key: string]: string };
 	capabilities?: IExtensionCapabilities;
+	phonon?: boolean;
 }
 
 export type IExtensionManifest = Readonly<IRelaxedExtensionManifest>;

@@ -7,6 +7,7 @@
 	"engines": {
 		"vscode": "^1.100.0"
 	},
+	"phonon": true,
 	"categories": ["Other"],
 	"activationEvents": ["*"],
 	"main": "./out/extension.js",

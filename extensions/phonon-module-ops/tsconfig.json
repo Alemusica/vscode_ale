@@ -1,13 +1,16 @@
 {
+	"extends": "../tsconfig.base.json",
 	"compilerOptions": {
-		"module": "Node16",
-		"target": "ES2022",
-		"outDir": "out",
-		"lib": ["ES2022"],
-		"sourceMap": true,
-		"rootDir": "src",
-		"strict": true,
-		"esModuleInterop": true
+		"rootDir": "./src",
+		"outDir": "./out",
+		"lib": ["ES2024", "DOM"],
+		"typeRoots": [
+			"./node_modules/@types"
+		],
+		"skipLibCheck": true
 	},
-	"exclude": ["node_modules", ".vscode-test"]
+	"include": [
+		"src/**/*",
+		"../../src/vscode-dts/vscode.d.ts"
+	]
 }
