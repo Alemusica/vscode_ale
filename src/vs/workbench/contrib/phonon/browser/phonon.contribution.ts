@@ -44,6 +44,7 @@ import { PhononAgentPoolService } from './phononAgentPoolService.js';
 import { PhononWebSpeechProvider } from './phononSpeechProvider.js';
 import { PhononMcpBridge } from './phononMcpBridge.js';
 import { PhononPlaywrightMcpTools } from './phononPlaywrightMcpTools.js';
+import { PhononLiquidTools } from './phononLiquidTools.js';
 import { AgentPoolViewPane } from './views/agentPoolViewPane.js';
 import { PhononHUDContribution } from './views/phononAgentHUD.js';
 import { ILiquidModuleRegistry } from '../common/liquidModule.js';
@@ -105,6 +106,7 @@ class PhononContribution extends Disposable implements IWorkbenchContribution {
 		this._registerMcpBridge();
 		this._wireIntentToCanvas();
 		this._registerPlaywrightTools();
+		this._registerLiquidTools();
 		registerLiquidExtensionPointHandlers(this.liquidModuleRegistry as LiquidModuleRegistry);
 		const sidebarDataProvider = registerLiquidSidebarTreeView(this.instantiationService, this.liquidModuleRegistry, this.compositionEngine, this.logService);
 		this._register(sidebarDataProvider.onDidRequestNavigation(async (intent) => {
@@ -354,6 +356,16 @@ class PhononContribution extends Disposable implements IWorkbenchContribution {
 			this._register(tools);
 		} catch {
 			this.logService.info('[Phonon] Playwright tools not available (desktop only)');
+		}
+	}
+
+	private _registerLiquidTools(): void {
+		try {
+			const tools = this.instantiationService.createInstance(PhononLiquidTools);
+			this._register(tools);
+			this.logService.info('[Phonon] Liquid tools registered');
+		} catch (err) {
+			this.logService.info('[Phonon] Liquid tools not available (language model tools service may not be present)');
 		}
 	}
 
