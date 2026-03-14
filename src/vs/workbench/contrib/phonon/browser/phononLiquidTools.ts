@@ -8,6 +8,8 @@ import { CancellationToken } from '../../../../base/common/cancellation.js';
 import { ILogService } from '../../../../platform/log/common/log.js';
 import { ILiquidModuleRegistry } from '../common/liquidModule.js';
 import { ICompositionEngine } from './liquidCompositor.js';
+import { validateIntent } from './liquidGatekeeper.js';
+import type { CompositionLayout } from '../common/liquidGraftTypes.js';
 import {
 	ILanguageModelToolsService,
 	IToolData,
@@ -115,10 +117,116 @@ const phonon_get_schema: ILiquidToolDef = {
 	},
 };
 
+const phonon_compose: ILiquidToolDef = {
+	id: 'phonon.liquid.compose',
+	name: 'phonon_compose',
+	description: 'Compose a canvas layout from entities and an action. Validates the intent through the 7-gate gatekeeper, composes via the compositor, and returns the composition intent JSON. The returned intent can be emitted in a phonon-intent block to render it on the canvas. Actions: show, compare, summarize, navigate, filter.',
+	inputSchema: {
+		type: 'object',
+		properties: {
+			entities: {
+				type: 'array',
+				items: { type: 'string' },
+				description: 'Entity IDs to compose (e.g. ["dish", "order"])',
+			},
+			action: {
+				type: 'string',
+				description: 'Composition action: show, compare, summarize, navigate, filter',
+			},
+			depth: {
+				type: 'number',
+				description: 'How many relatesTo hops to follow (0-2, default 0)',
+			},
+			preferredLayout: {
+				type: 'string',
+				description: 'Preferred layout: single, split-horizontal, split-vertical, grid, stack',
+			},
+		},
+		required: ['entities', 'action'],
+	},
+	async invoke(params, registry, compositor) {
+		const entities = params.entities as string[] | undefined;
+		const action = params.action as string | undefined;
+
+		if (!entities || !Array.isArray(entities) || !action) {
+			return {
+				content: [{
+					kind: 'text' as const,
+					value: JSON.stringify({ error: 'entities (array) and action (string) are required' }),
+				}],
+			};
+		}
+
+		if (entities.length === 0) {
+			return {
+				content: [{
+					kind: 'text' as const,
+					value: JSON.stringify({ error: 'entities array must contain at least one entity ID' }),
+				}],
+			};
+		}
+
+		// Validate through 7-gate gatekeeper
+		const gateResult = validateIntent(
+			{ action, entities, depth: params.depth, preferredLayout: params.preferredLayout },
+			registry,
+		);
+
+		if (!gateResult.valid) {
+			return {
+				content: [{
+					kind: 'text' as const,
+					value: JSON.stringify({
+						error: gateResult.error,
+						gate: gateResult.gate,
+						gateName: gateResult.gateName,
+					}),
+				}],
+			};
+		}
+
+		// Compose via compositor
+		const sp = gateResult.sanitizedParams!;
+		const composed = compositor.composeFromIntent(
+			(sp.entities as string[]) ?? [],
+			(sp.action as string) ?? 'show',
+			(sp.depth as number) ?? 0,
+			sp.preferredLayout as CompositionLayout | undefined,
+		);
+
+		if (!composed) {
+			return {
+				content: [{
+					kind: 'text' as const,
+					value: JSON.stringify({ error: 'Compositor returned no composition for the given entities and action' }),
+				}],
+			};
+		}
+
+		return { content: [{ kind: 'text' as const, value: JSON.stringify(composed) }] };
+	},
+};
+
+const phonon_capabilities: ILiquidToolDef = {
+	id: 'phonon.liquid.capabilities',
+	name: 'phonon_capabilities',
+	description: 'Return the full capability summary of the Phonon module system: all registered modules, entities (with field names), views, and grafts (with descriptions, domains, categories, tags). Use this for one-shot discovery of everything available.',
+	inputSchema: {
+		type: 'object',
+		properties: {},
+	},
+	async invoke(_params, registry) {
+		const capabilities = registry.getCapabilities();
+		return { content: [{ kind: 'text' as const, value: JSON.stringify(capabilities) }] };
+	},
+};
+
 /** All Phonon Liquid tool definitions. Exported for testing. */
 export const LIQUID_TOOLS: readonly ILiquidToolDef[] = [
 	phonon_list_grafts,
 	phonon_get_schema,
+	phonon_compose,
+	phonon_capabilities,
 ];
 
 /**

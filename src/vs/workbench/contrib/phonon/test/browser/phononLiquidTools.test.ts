@@ -181,4 +181,114 @@ suite('PhononLiquidTools', () => {
 			assert.ok(result.error);
 		});
 	});
+
+	suite('phonon_compose', () => {
+
+		test('composes entities with action and returns intent', async () => {
+			registry.updateEntities([
+				makeEntity({ id: 'dish', label: 'Piatto' }),
+			]);
+			registry.updateGrafts([
+				makeGraft({ id: 'dishDetail', label: 'Dish Detail', category: 'detail', shows: ['dish'] }),
+			]);
+			const raw = await invokeTool('phonon_compose', { entities: ['dish'], action: 'show' }, registry, compositor);
+			const result = JSON.parse(raw);
+			assert.strictEqual(result.layout, 'single');
+			assert.strictEqual(result.slots.length, 1);
+			assert.strictEqual(result.slots[0].graftId, 'dishDetail');
+		});
+
+		test('returns validation error for unknown entity', async () => {
+			const raw = await invokeTool('phonon_compose', { entities: ['nonexistent'], action: 'show' }, registry, compositor);
+			const result = JSON.parse(raw);
+			assert.ok(result.error);
+			assert.ok(result.gate !== undefined);
+		});
+
+		test('returns validation error for unknown action', async () => {
+			registry.updateEntities([
+				makeEntity({ id: 'dish', label: 'Piatto' }),
+			]);
+			const raw = await invokeTool('phonon_compose', { entities: ['dish'], action: 'destroy' }, registry, compositor);
+			const result = JSON.parse(raw);
+			assert.ok(result.error);
+		});
+
+		test('returns error when entities is missing', async () => {
+			const raw = await invokeTool('phonon_compose', { action: 'show' }, registry, compositor);
+			const result = JSON.parse(raw);
+			assert.ok(result.error);
+		});
+
+		test('returns error when entities is empty array', async () => {
+			const raw = await invokeTool('phonon_compose', { entities: [], action: 'show' }, registry, compositor);
+			const result = JSON.parse(raw);
+			assert.ok(result.error);
+			assert.ok(result.error.includes('at least one'));
+		});
+
+		test('respects preferredLayout', async () => {
+			registry.updateEntities([
+				makeEntity({ id: 'dish', label: 'Piatto' }),
+				makeEntity({ id: 'order', label: 'Ordine' }),
+			]);
+			registry.updateGrafts([
+				makeGraft({ id: 'dishDetail', label: 'Dish', category: 'detail', shows: ['dish'] }),
+				makeGraft({ id: 'orderTable', label: 'Orders', category: 'table', shows: ['order'] }),
+			]);
+			const raw = await invokeTool('phonon_compose', {
+				entities: ['dish', 'order'],
+				action: 'show',
+				preferredLayout: 'split-vertical',
+			}, registry, compositor);
+			const result = JSON.parse(raw);
+			assert.strictEqual(result.slots.length, 2);
+			assert.strictEqual(result.layout, 'split-vertical');
+		});
+
+		test('returns composable intent JSON that matches ICompositionIntent', async () => {
+			registry.updateEntities([
+				makeEntity({ id: 'dish', label: 'Piatto' }),
+			]);
+			registry.updateGrafts([
+				makeGraft({ id: 'dishStat', label: 'Stats', category: 'stat', shows: ['dish'], tokenWeight: 400 }),
+			]);
+			const raw = await invokeTool('phonon_compose', { entities: ['dish'], action: 'summarize' }, registry, compositor);
+			const result = JSON.parse(raw);
+			// Must have layout + slots (ICompositionIntent shape)
+			assert.ok(result.layout);
+			assert.ok(Array.isArray(result.slots));
+			assert.ok(result.title);
+		});
+	});
+
+	suite('phonon_capabilities', () => {
+
+		test('returns full capability summary', async () => {
+			registry.updateEntities([
+				makeEntity({ id: 'dish', label: 'Piatto', schema: { type: 'object', properties: { name: { type: 'string' } } } }),
+			]);
+			registry.updateGrafts([
+				makeGraft({ id: 'g1', label: 'One', description: 'First', domain: 'ops', category: 'stat', tags: ['analytics'], shows: ['dish'] }),
+			]);
+			const raw = await invokeTool('phonon_capabilities', {}, registry, compositor);
+			const result = JSON.parse(raw);
+			assert.ok(Array.isArray(result.entities));
+			assert.ok(Array.isArray(result.grafts));
+			assert.ok(Array.isArray(result.views));
+			assert.ok(Array.isArray(result.modules));
+			assert.strictEqual(result.entities.length, 1);
+			assert.strictEqual(result.grafts.length, 1);
+			assert.strictEqual(result.entities[0].fields.length, 1);
+			assert.strictEqual(result.entities[0].fields[0], 'name');
+		});
+
+		test('returns empty summary when registry is empty', async () => {
+			const raw = await invokeTool('phonon_capabilities', {}, registry, compositor);
+			const result = JSON.parse(raw);
+			assert.strictEqual(result.entities.length, 0);
+			assert.strictEqual(result.grafts.length, 0);
+			assert.strictEqual(result.views.length, 0);
+		});
+	});
 });
