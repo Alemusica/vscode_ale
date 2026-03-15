@@ -332,6 +332,9 @@ export class LiquidCanvasEditor extends EditorPane {
 		const savings = metrics.graftEquivalentTokens > 0
 			? (1 - metrics.intentTokens / metrics.graftEquivalentTokens) * 100
 			: 0;
+		// Energy per token: ~0.01 Wh (conservative upper bound for large model inference).
+		// Carbon intensity: ~0.4 gCO2/Wh (global average grid).
+		// See design doc: docs/plans/2026-03-10-graft-kit-mvp-design.md "Environmental Impact" section.
 		const energyWh = tokensSaved * 0.01;
 		const co2g = energyWh * 0.4;
 

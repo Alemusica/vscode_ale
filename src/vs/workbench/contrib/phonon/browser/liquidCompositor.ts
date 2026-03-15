@@ -104,20 +104,7 @@ export class CompositionEngine extends Disposable implements ICompositionEngine 
 			transient: false,
 		};
 
-		const graftEquivalentTokens = slots.reduce((sum, s) => {
-			const g = this._registry.grafts.find(m => m.id === s.graftId);
-			return sum + (g?.tokenWeight ?? 0);
-		}, 0);
-		const publishers = new Set(slots.map(s => {
-			const g = this._registry.grafts.find(m => m.id === s.graftId);
-			return g?.extensionId ?? 'unknown';
-		}));
-		this._onDidCompose.fire({
-			graftCount: slots.length,
-			publisherCount: publishers.size,
-			graftEquivalentTokens,
-			intentTokens: 0,
-		});
+		this._fireMetrics(slots, 0);
 
 		return result;
 	}
@@ -178,6 +165,19 @@ export class CompositionEngine extends Disposable implements ICompositionEngine 
 			transient: true,
 		};
 
+		// Estimate intent tokens: JSON string length / 4 ~ cl100k_base token count (conservative).
+		// See design doc: docs/plans/2026-03-10-graft-kit-mvp-design.md "Token Savings" section.
+		const intentTokens = Math.ceil(JSON.stringify({ entities, action, depth: clampedDepth, preferredLayout }).length / 4);
+		this._fireMetrics(slots, intentTokens);
+
+		return result;
+	}
+
+	/**
+	 * Compute and fire composition metrics for the given slots.
+	 * Aggregates tokenWeight from the registry and counts unique publishers.
+	 */
+	private _fireMetrics(slots: readonly ICompositionSlot[], intentTokens: number): void {
 		const graftEquivalentTokens = slots.reduce((sum, s) => {
 			const g = this._registry.grafts.find(m => m.id === s.graftId);
 			return sum + (g?.tokenWeight ?? 0);
@@ -186,15 +186,12 @@ export class CompositionEngine extends Disposable implements ICompositionEngine 
 			const g = this._registry.grafts.find(m => m.id === s.graftId);
 			return g?.extensionId ?? 'unknown';
 		}));
-		const intentTokens = Math.ceil(JSON.stringify({ entities, action, depth: clampedDepth, preferredLayout }).length / 4);
 		this._onDidCompose.fire({
 			graftCount: slots.length,
 			publisherCount: publishers.size,
 			graftEquivalentTokens,
 			intentTokens,
 		});
-
-		return result;
 	}
 
 	/**
